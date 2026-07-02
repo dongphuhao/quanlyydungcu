@@ -4,9 +4,9 @@ Tài liệu định hướng cho Claude Code khi làm việc trong repo này. Đ
 
 ## 0. Bối cảnh quan trọng — đọc trước khi làm bất cứ việc gì
 
-Code hiện có trong repo (`App.tsx`, `services/persistence.ts`, `components/*`) là **bản prototype cũ dùng localStorage**, được sinh từ Google AI Studio. Bản này **KHÔNG còn là kiến trúc đích** của dự án — chỉ giữ lại làm tài liệu tham khảo cho nghiệp vụ và UI đã được duyệt. Dự án đang trong quá trình chuyển từ prototype sang hệ thống production thật.
+Repo đã chuyển sang kiến trúc thật: `client/` (React + Vite) gọi REST API của `server/` (Node/Express + TypeORM + PostgreSQL) — xem chi tiết trạng thái ở mục 8. `client/services/persistence.ts` và `client/services/mockData.ts` là **bản prototype cũ dùng localStorage**, được sinh từ Google AI Studio, **KHÔNG còn được import ở đâu trong app nữa** — chỉ giữ lại làm tài liệu tham khảo nghiệp vụ/UI đã duyệt. Nguồn sự thật cho business logic bây giờ là `server/src/services/*`.
 
-**KHÔNG được tiếp tục dùng `localStorage` làm nơi lưu trữ dữ liệu nghiệp vụ.** Không thêm tính năng mới vào `services/persistence.ts` theo kiểu cũ. Mọi tính năng mới phải được thiết kế theo kiến trúc REST API + PostgreSQL ở mục 3, kể cả khi phải viết lại từ đầu logic đang có trong `persistence.ts`.
+**KHÔNG được tiếp tục dùng `localStorage` làm nơi lưu trữ dữ liệu nghiệp vụ.** Không thêm tính năng mới vào `client/services/persistence.ts` theo kiểu cũ. Mọi tính năng mới phải được thiết kế theo kiến trúc REST API + PostgreSQL ở mục 3, thêm endpoint/service tương ứng trong `server/`.
 
 ## 1. Mục tiêu cuối cùng của dự án
 
@@ -134,28 +134,46 @@ Yêu cầu: tối giản, hiện đại, chuyên nghiệp, nền trắng, màu c
 
 ## 8. Trạng thái migration hiện tại
 
-- Repo hiện tại **chưa có backend** — chỉ có frontend React + localStorage (bản cũ). Khi bắt đầu xây dựng backend thật, cần tách rõ cấu trúc thư mục (ví dụ `client/` cho React và `server/` cho Node/Express), hoặc dùng monorepo layout — **bàn với người dùng trước khi tái cấu trúc thư mục lớn**, đừng tự ý di chuyển file hàng loạt.
-- Không xóa code cũ trong `services/persistence.ts`/`components/*` khi chưa có sự đồng ý — coi là tài liệu tham khảo cho tới khi tính năng tương ứng đã có bản thay thế chạy qua API thật.
-- Việc chọn ORM/migration tool cho PostgreSQL (Prisma, TypeORM, Knex, hay raw SQL + node-postgres), cách tổ chức Express (routes/controllers/services), và chiến lược backup/restore (pg_dump theo lịch, hay công cụ khác) **chưa được quyết định** — hỏi người dùng trước khi chọn, đừng tự ý quyết định khi bắt đầu code phần backend.
-- Import/Export Excel: bản cũ đã có `xlsx` ở frontend cho export — khi có backend, cân nhắc chuyển xử lý file (đặc biệt import) sang backend để validate dữ liệu trước khi ghi PostgreSQL, tránh xử lý Excel không kiểm soát ở client.
-- Barcode: bản cũ dùng `jsbarcode` ở frontend để in — giữ lại được vì đây là hiển thị/in ấn thuần túy, không phải nguồn dữ liệu.
+Backend "core" đã dựng xong (client/server tách monorepo, schema PostgreSQL, auth session, audit log, RBAC, toàn bộ CRUD + state machine mượn/trả/tiệt trùng/thanh lý port từ `persistence.ts` sang `server/src/services/*`, frontend đã nối API thật). Chi tiết còn lại:
 
-## 9. Lệnh phát triển hiện tại (frontend cũ — sẽ cập nhật khi có backend)
+- **Chưa làm** (để phase sau, xem mục 10 cũ đã chốt hướng nhưng chưa implement):
+  - Backup/restore PostgreSQL định kỳ (pg_dump/restore) — chưa có script/lịch chạy.
+  - Import/Export Excel qua backend — hiện tại **export vẫn ở frontend** bằng `xlsx` (giữ nguyên như bản cũ, `App.tsx` hàm `exportToExcel`); chưa có **import** Excel ở cả frontend lẫn backend.
+  - Bảng `medical_linens` (đồ vải y tế) — đã chốt là bảng riêng (không mở rộng `MedicalTool`), nhưng entity/migration/API chưa tạo.
+  - Barcode: không đổi, vẫn `jsbarcode` thuần frontend (hiển thị/in, không phải nguồn dữ liệu) — đúng như dự kiến ban đầu.
+- Không xóa `client/services/persistence.ts`/`mockData.ts` khi chưa có sự đồng ý — vẫn giữ làm tài liệu tham khảo dù không còn được import.
+- Khi thêm tính năng backend mới: entity → `server/src/entities/`, migration tay trong `server/src/migrations/` (chưa dùng `migration:generate` tự động vì cần Postgres sống để introspect), business logic + audit log trong `server/src/services/`, route/controller mỏng chỉ gọi service.
 
+## 9. Lệnh phát triển
+
+Frontend (`client/`):
 ```bash
-npm run dev       # chạy dev server frontend (port 3000)
+cd client
+npm run dev       # dev server (port 3000, proxy /api sang server 4000)
 npm run build     # build production
 npm run preview   # preview bản build
-npm run lint      # thực chất là `tsc --noEmit`
+npm run lint      # tsc --noEmit
 ```
 
-Chưa có lệnh cho backend (chưa tồn tại) và chưa có test runner nào được cấu hình. Khi thêm backend/test, cập nhật lại mục này.
+Backend (`server/`) — cần PostgreSQL đang chạy (xem `server/docker-compose.yml` để chạy Postgres cục bộ qua Docker, hoặc dùng Postgres có sẵn + `server/.env` trỏ tới):
+```bash
+cd server
+cp .env.example .env        # chỉnh DB_*, SESSION_SECRET nếu cần
+docker compose up -d        # tuỳ chọn: Postgres cục bộ qua Docker
+npm run migration:run       # tạo schema
+npm run seed                # dữ liệu demo — admin/admin, manager/123, requester/123, viewer/viewer
+npm run dev                 # server dev (port 4000)
+npm run lint                # tsc --noEmit
+npm test                    # Vitest — cần thêm DB test riêng (tạo database quanlyydungcu_test)
+```
 
-## 10. Việc cần hỏi lại người dùng trước khi tự quyết
+## 10. Quyết định kiến trúc đã chốt (không hỏi lại trừ khi người dùng muốn đổi)
 
-- Cấu trúc thư mục monorepo cho client/server.
-- ORM/migration tool và cách tổ chức code backend (Express routes/controllers/services).
-- Chiến lược Backup/Restore cụ thể cho PostgreSQL.
-- Cơ chế Authentication cụ thể (JWT vs session, thời hạn token, refresh token...).
-- Thiết kế entity riêng cho "đồ vải y tế" hay mở rộng entity dụng cụ hiện có.
-- Test framework khi bắt đầu viết test cho backend/frontend mới.
+- **Cấu trúc**: monorepo `client/` + `server/`.
+- **ORM**: TypeORM (entity + decorator, migration viết tay trong `server/src/migrations/`).
+- **Auth**: session lưu server-side trong PostgreSQL (`express-session` + `connect-pg-simple`), không dùng JWT. Cookie `ydungcu.sid`, httpOnly, 8 giờ.
+- **RBAC**: nguồn cấu hình duy nhất ở `server/src/config/permissions.ts` (`ROLE_PERMISSIONS`, `ROLE_GROUPS`) — frontend không tự khai báo nữa, luôn đọc `allowedTabs` từ `GET /api/auth/me`.
+- **Test**: Vitest cho backend (`server/src/**/*.test.ts`), chưa có test frontend.
+- **Đồ vải y tế**: bảng riêng `medical_linens` khi implement (chưa implement — xem mục 8).
+
+Việc còn cần hỏi người dùng khi bắt đầu: chiến lược Backup/Restore cụ thể cho PostgreSQL, và cách xử lý Import Excel (validate ở đâu, cho phép ghi đè hay chỉ thêm mới).

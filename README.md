@@ -1,20 +1,43 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Y Dụng Cụ — Quản lý y dụng cụ & đồ vải y tế
 
-# Run and deploy your AI Studio app
+Hệ thống quản lý dụng cụ phẫu thuật và gói mổ cho bệnh viện. Kiến trúc: `client/` (React + Vite) gọi REST API của `server/` (Node/Express + TypeORM + PostgreSQL). Xem `CLAUDE.md` để biết đầy đủ bối cảnh, quyết định kiến trúc và phạm vi đã/chưa làm.
 
-This contains everything you need to run your app locally.
+## Chạy cục bộ
 
-View your app in AI Studio: https://ai.studio/apps/6dbb5578-386a-4378-9252-ee30be7fbabf
+**Yêu cầu:** Node.js 20+, PostgreSQL (hoặc Docker để chạy Postgres cục bộ qua `server/docker-compose.yml`).
 
-## Run Locally
+### 1. Backend (`server/`)
 
-**Prerequisites:**  Node.js
+```bash
+cd server
+npm install
+cp .env.example .env      # chỉnh DB_*, SESSION_SECRET nếu cần
+docker compose up -d      # tuỳ chọn: khởi động PostgreSQL cục bộ qua Docker
+npm run migration:run     # tạo schema
+npm run seed              # dữ liệu demo
+npm run dev                # http://localhost:4000
+```
 
+Tài khoản demo sau khi seed: `admin/admin`, `manager/123`, `requester/123`, `viewer/viewer`.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 2. Frontend (`client/`)
+
+```bash
+cd client
+npm install
+npm run dev                # http://localhost:3000 (proxy /api sang server:4000)
+```
+
+### Kiểm thử
+
+```bash
+cd server && npm run lint && npm test   # cần tạo database quanlyydungcu_test trước
+cd client && npm run lint
+```
+
+## Cấu trúc thư mục
+
+```
+client/    React 19 + TypeScript + Vite — UI, gọi REST API qua client/services/api.ts
+server/    Node.js + Express + TypeORM — REST API, business logic, audit log, auth
+```
